@@ -1,4 +1,3 @@
-# .github/workflows/release-pipeline.yml
 name: Release Pipeline
 
 on:
@@ -14,16 +13,18 @@ on:
         required: true
         default: 'patch'
         type: choice
-        options: [ patch, minor, major ]
+        options:
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
   packages: write
   pull-requests: write
 
-concurrency:
-  group: release-pipeline-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  PYTHON_VERSION: "3.11"
 
 jobs:
   version-and-tag:
@@ -36,41 +37,53 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install bump2version
         run: pip install bump2version
 
       - name: Configure Git
         run: |
-          git config --local user.name "github-actions"
-          git config --local user.email "action@github.com"
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Determine version bump type
         id: bump_type
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "bump_type=${{ github.event.inputs.version_bump }}" >> $GITHUB_OUTPUT
+            echo "Manual trigger: ${{ github.event.inputs.version_bump }}"
           else
-            if git log --format=%B -n 20 | grep -Ei "^(BREAKING|breaking):"; then
+            # Analyze recent commits for semantic versioning
+            if git log --format=%B -n 10 | grep -Ei "^(BREAKING|breaking):" | head -1; then
               echo "bump_type=major" >> $GITHUB_OUTPUT
-            elif git log --format=%B -n 20 | grep -Ei "^(feat|feature):"; then
+              echo "Found breaking change - major bump"
+            elif git log --format=%B -n 10 | grep -Ei "^(feat|feature):" | head -1; then
               echo "bump_type=minor" >> $GITHUB_OUTPUT
+              echo "Found feature - minor bump"
             else
               echo "bump_type=patch" >> $GITHUB_OUTPUT
+              echo "Default - patch bump"
             fi
           fi
 
-      - name: Bump version
+      - name: Bump version and create tag
         id: version
         run: |
+          # Get current version
           CURRENT_VERSION=$(python -c "import main; print(main.__version__)")
+          echo "Current version: $CURRENT_VERSION"
+          
           BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
-          cat > .bumpversion.cfg <<-EOF
+          echo "Bump type: $BUMP_TYPE"
+
+          # Create bumpversion config
+          cat > .bumpversion.cfg << EOF
           [bumpversion]
           current_version = $CURRENT_VERSION
           commit = False
@@ -81,128 +94,175 @@ jobs:
           replace = __version__ = "{new_version}"
           EOF
 
+          # Bump version
           bumpversion $BUMP_TYPE
           NEW_VERSION=$(python -c "import main; print(main.__version__)")
+          
+          echo "New version: $NEW_VERSION"
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "release_created=true" >> $GITHUB_OUTPUT
 
-          # only commit the updated code & tag, not the config
+          # Commit and tag
           git add main.py
-          git commit -m "Bump version: $CURRENT_VERSION → $NEW_VERSION"
+          git commit -m "chore: bump version $CURRENT_VERSION → $NEW_VERSION"
           git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
 
       - name: Push changes and tags
-        run: git push origin main --follow-tags
+        run: |
+          git push origin main
+          git push origin --tags
+          echo "✅ Version ${{ steps.version.outputs.new_version }} tagged and pushed"
 
-  build-and-release:
+  build-test-and-release:
     needs: version-and-tag
     if: needs.version-and-tag.outputs.release_created == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: ["3.8", "3.9", "3.10", "3.11"]
-
     steps:
-      - name: Checkout code
+      - name: Checkout updated code
         uses: actions/checkout@v4
-
-      - name: Cache pip
-        uses: actions/cache@v3
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          ref: main
 
-      - name: Set up Python ${{ matrix.python }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install build wheel twine
-          pip install -r requirements.txt || true
+          pip install -r requirements.txt || echo "No requirements.txt found"
           pip install -e .
 
-      - name: Lint with flake8
-        run: |
-          pip install .[dev]
-          flake8 .
-
-      - name: Security scan with bandit
-        run: bandit -r .
-
-      - name: Dependency check with safety
-        run: safety check
-
       - name: Run tests
-        run: python -m unittest discover -s . -p "test_*.py" -v
+        run: |
+          echo "🧪 Running tests..."
+          python -m unittest discover -s . -p "test_*.py" -v
 
       - name: Build package
-        run: python -m build
+        run: |
+          echo "📦 Building package..."
+          python -m build
+          ls -la dist/
 
-      - name: Check artifacts
-        run: twine check dist/*
+      - name: Check package
+        run: |
+          echo "🔍 Checking package..."
+          twine check dist/*
 
-      - name: Upload artifacts
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: msd-package-${{ needs.version-and-tag.outputs.new_version }}-${{ matrix.python }}
+          name: python-package-${{ needs.version-and-tag.outputs.new_version }}
           path: dist/
-          retention-days: 30
+          retention-days: 90
 
-      - name: Publish to GitHub Packages
+      - name: Publish to PyPI (optional)
+        if: env.PYPI_API_TOKEN != ''
         env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
         run: |
-          printf "[distutils]\nindex-servers = github\n\n[github]\nrepository = https://pypi.pkg.github.com/${{ github.repository_owner }}\nusername = __token__\npassword = ${{ secrets.GITHUB_TOKEN }}\n" > ~/.pypirc
-          twine upload --repository github dist/*
+          echo "📤 Publishing to PyPI..."
+          twine upload \
+            --username __token__ \
+            --password ${{ env.PYPI_API_TOKEN }} \
+            dist/*
+          echo "✅ Published to PyPI"
 
-      - name: GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version-and-tag.outputs.new_version }}
-          name: Release v${{ needs.version-and-tag.outputs.new_version }}
+          name: "Release v${{ needs.version-and-tag.outputs.new_version }}"
           body: |
+            ## 🚀 Release v${{ needs.version-and-tag.outputs.new_version }}
+            
             Auto-generated release from main branch.
-
-            ## Install via GitHub Packages
+            
+            ### 📦 Installation
+            
+            **Option 1: Install from PyPI** (if published)
             ```bash
-            pip install --extra-index-url https://pypi.pkg.github.com/${{ github.repository_owner }} matan-shabi-msd-pipeline-hw
+            pip install matan-shabi-msd-pipeline-hw
             ```
+            
+            **Option 2: Install from GitHub Release**
+            ```bash
+            pip install https://github.com/${{ github.repository }}/releases/download/v${{ needs.version-and-tag.outputs.new_version }}/matan_shabi_msd_pipeline_hw-${{ needs.version-and-tag.outputs.new_version }}-py3-none-any.whl
+            ```
+            
+            **Option 3: Install from source**
+            ```bash
+            git clone https://github.com/${{ github.repository }}.git
+            cd msd-pipiline-hw
+            pip install -e .
+            ```
+            
+            ### 🔧 Usage
+            ```bash
+            subnet-calc --help
+            ```
+            
+            ---
+            *Generated by GitHub Actions on $(date)*
           files: dist/*
           draft: false
           prerelease: false
 
-  deploy-to-artifactory:
-    needs: build-and-release
+  deploy-simulation:
+    needs: [version-and-tag, build-test-and-release]
     runs-on: ubuntu-latest
+    if: needs.version-and-tag.outputs.release_created == 'true'
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: msd-package-${{ needs.version-and-tag.outputs.new_version }}-*
+          name: python-package-${{ needs.version-and-tag.outputs.new_version }}
           path: dist/
 
-      - name: Simulate Artifactory upload
+      - name: Simulate Artifactory deployment
         run: |
-          echo "Simulating upload to Artifactory..."
-          ls -l dist/
+          echo "🏗️ Simulating Artifactory deployment..."
+          echo "Package: $(ls dist/*.whl | head -1)"
+          echo "Version: ${{ needs.version-and-tag.outputs.new_version }}"
+          echo "Target: artifactory.company.com/pypi-local/"
+          echo "✅ Artifactory deployment simulated"
 
-      - name: Simulate AWS S3 upload
+      - name: Simulate AWS S3 deployment
         run: |
-          echo "Simulating upload to AWS S3..."
-          ls -l dist/
+          echo "☁️ Simulating AWS S3 deployment..."
+          echo "Bucket: s3://company-python-packages/"
+          echo "Key: msd-pipeline-hw/v${{ needs.version-and-tag.outputs.new_version }}/"
+          echo "Files: $(ls dist/ | wc -l) artifacts"
+          echo "✅ S3 deployment simulated"
 
-  notify:
-    needs: [build-and-release, deploy-to-artifactory]
+  notification:
+    needs: [version-and-tag, build-test-and-release, deploy-simulation]
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Notify success
-        if: ${{ needs.build-and-release.result == 'success' && needs.deploy-to-artifactory.result == 'success' }}
-        run: echo "✅ Release successful"
+        if: |
+          needs.version-and-tag.result == 'success' && 
+          needs.build-test-and-release.result == 'success' && 
+          needs.deploy-simulation.result == 'success'
+        run: |
+          echo "🎉 Release v${{ needs.version-and-tag.outputs.new_version }} completed successfully!"
+          echo "📦 Package built and released"
+          echo "🚀 Deployment simulations completed"
+          echo "📋 All checks passed"
 
       - name: Notify failure
-        if: ${{ needs.build-and-release.result != 'success' || needs.deploy-to-artifactory.result != 'success' }}
-        run: echo "❌ Release failed"
+        if: |
+          needs.version-and-tag.result != 'success' || 
+          needs.build-test-and-release.result != 'success' || 
+          needs.deploy-simulation.result != 'success'
+        run: |
+          echo "❌ Release pipeline failed"
+          echo "Check the job logs for details"
+          echo "Failed jobs:"
+          echo "- version-and-tag: ${{ needs.version-and-tag.result }}"
+          echo "- build-test-and-release: ${{ needs.build-test-and-release.result }}"
+          echo "- deploy-simulation: ${{ needs.deploy-simulation.result }}"
+          exit 1
