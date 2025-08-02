@@ -20,255 +20,179 @@ on:
 
 permissions:
   contents: write
+  packages: write
   pull-requests: write
-  repository-projects: write
 
 jobs:
   version-and-tag:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
       release_created: ${{ steps.version.outputs.release_created }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install version bump tools
-      run: |
-        python -m pip install --upgrade pip
-        pip install bump2version
+      - name: Install bump2version
+        run: |
+          pip install bump2version
 
-    - name: Configure git
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+      - name: Configure Git
+        run: |
+          git config --local user.name "github-actions"
+          git config --local user.email "action@github.com"
 
-    - name: Determine version bump type
-      id: bump_type
-      run: |
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-          echo "bump_type=${{ github.event.inputs.version_bump }}" >> $GITHUB_OUTPUT
-        else
-          # Auto-determine bump type based on commit messages
-          if git log --format=%B -n 20 | grep -E "^(BREAKING|breaking):" > /dev/null; then
-            echo "bump_type=major" >> $GITHUB_OUTPUT
-          elif git log --format=%B -n 20 | grep -E "^(feat|feature):" > /dev/null; then
-            echo "bump_type=minor" >> $GITHUB_OUTPUT
+      - name: Determine version bump type
+        id: bump_type
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "bump_type=${{ github.event.inputs.version_bump }}" >> $GITHUB_OUTPUT
           else
-            echo "bump_type=patch" >> $GITHUB_OUTPUT
+            if git log --format=%B -n 20 | grep -E "^(BREAKING|breaking):" > /dev/null; then
+              echo "bump_type=major" >> $GITHUB_OUTPUT
+            elif git log --format=%B -n 20 | grep -E "^(feat|feature):" > /dev/null; then
+              echo "bump_type=minor" >> $GITHUB_OUTPUT
+            else
+              echo "bump_type=patch" >> $GITHUB_OUTPUT
+            fi
           fi
-        fi
 
-    - name: Get current version and bump
-      id: version
-      run: |
-        CURRENT_VERSION=$(python -c "import main; print(main.__version__)")
-        BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
-        echo "Current version: $CURRENT_VERSION"
-        echo "Bumping version with type: $BUMP_TYPE"
-        
-        # Create .bumpversion.cfg with current version
-        cat > .bumpversion.cfg << EOF
-        [bumpversion]
-        current_version = $CURRENT_VERSION
-        commit = False
-        tag = False
-        
-        [bumpversion:file:main.py]
-        search = __version__ = "{current_version}"
-        replace = __version__ = "{new_version}"
-        EOF
-        
-        # Run bumpversion to update files
-        bumpversion $BUMP_TYPE --dry-run --verbose
-        bumpversion $BUMP_TYPE
-        
-        # Get the new version
-        NEW_VERSION=$(python -c "import main; print(main.__version__)")
-        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-        echo "release_created=true" >> $GITHUB_OUTPUT
-        
-        # Create git commit and tag manually
-        git add main.py
-        git commit -m "Bump version: $CURRENT_VERSION → $NEW_VERSION"
-        git tag -a "v$NEW_VERSION" -m "Bump version: $CURRENT_VERSION → $NEW_VERSION"
-        
-        echo "Version bumped to: $NEW_VERSION"
+      - name: Bump version
+        id: version
+        run: |
+          CURRENT_VERSION=$(python -c "import main; print(main.__version__)")
+          BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
 
-    - name: Push changes
-      run: |
-        git push origin main --follow-tags
+          cat > .bumpversion.cfg <<EOF
+          [bumpversion]
+          current_version = $CURRENT_VERSION
+          commit = False
+          tag = False
+
+          [bumpversion:file:main.py]
+          search = __version__ = "{current_version}"
+          replace = __version__ = "{new_version}"
+          EOF
+
+          bumpversion $BUMP_TYPE
+          NEW_VERSION=$(python -c "import main; print(main.__version__)")
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "release_created=true" >> $GITHUB_OUTPUT
+
+          git add main.py
+          git commit -m "Bump version: $CURRENT_VERSION → $NEW_VERSION"
+          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+
+      - name: Push changes
+        run: git push origin main --follow-tags
 
   build-and-release:
     needs: version-and-tag
     if: needs.version-and-tag.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        ref: main
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build wheel twine
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install build wheel twine
+          pip install -r requirements.txt
+          pip install -e .
 
-    - name: Install project dependencies
-      run: |
-        pip install -r requirements.txt
-        pip install -e .
+      - name: Run tests
+        run: python -m unittest discover -s . -p "test_*.py" -v
 
-    - name: Run tests before build
-      run: |
-        python -m unittest discover -s . -p "test_*.py" -v
+      - name: Build package
+        run: python -m build
 
-    - name: Build wheel and source distribution
-      run: |
-        python -m build
-        ls -la dist/
+      - name: Check artifacts
+        run: twine check dist/*
 
-    - name: Check build artifacts
-      run: |
-        twine check dist/*
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: msd-package-${{ needs.version-and-tag.outputs.new_version }}
+          path: dist/
+          retention-days: 30
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: python-package-${{ needs.version-and-tag.outputs.new_version }}
-        path: dist/
-        retention-days: 90
+      - name: Publish to GitHub Packages
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ~/.pypirc
+          cat > ~/.pypirc <<EOF
+          [distutils]
+          index-servers = github
 
-    - name: Publish to GitHub Packages
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        # Configure twine for GitHub Packages
-        echo "Publishing to GitHub Packages..."
-        
-        # Create .pypirc for GitHub Packages
-        cat > ~/.pypirc << EOF
-        [distutils]
-        index-servers = github
-        
-        [github]
-        repository = https://pypi.pkg.github.com/${{ github.repository_owner }}/
-        username = __token__
-        password = ${{ secrets.GITHUB_TOKEN }}
-        EOF
-        
-        # GitHub Packages requires package name to include owner
-        # We need to update setup.py for GitHub Packages compatibility
-        echo "Configuring package for GitHub Packages..."
-        
-        # For demonstration, we'll show the command structure
-        echo "Would publish with: twine upload --repository github dist/*"
-        echo "Package would be available at: https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/packages"
-        echo "✅ Package ready for GitHub Packages"
-        
-        # Note: To actually publish, you would need to:
-        # 1. Update package name in setup.py to include owner: "matan-shabi-simple-calculator"
-        # 2. Uncomment the following line:
-        # twine upload --repository github dist/*
+          [github]
+          repository = https://pypi.pkg.github.com/${{ github.repository_owner }}
+          username = __token__
+          password = ${{ secrets.GITHUB_TOKEN }}
+          EOF
 
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: v${{ needs.version-and-tag.outputs.new_version }}
-        name: Release v${{ needs.version-and-tag.outputs.new_version }}
-        body: |
-          ## Changes in v${{ needs.version-and-tag.outputs.new_version }}
-          
-          Auto-generated release from main branch.
-          
-          ### Package Installation
-          ```bash
-          pip install simple-calculator==${{ needs.version-and-tag.outputs.new_version }}
-          ```
-          
-          ### Artifacts
-          - Python wheel: `simple_calculator-${{ needs.version-and-tag.outputs.new_version }}-py3-none-any.whl`
-          - Source distribution: `simple-calculator-${{ needs.version-and-tag.outputs.new_version }}.tar.gz`
-          
-          ### Package Registry
-          - Available on GitHub Packages
-          - Download artifacts from this release
-        files: |
-          dist/*
-        draft: false
-        prerelease: false
+          twine upload --repository github dist/*
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.version-and-tag.outputs.new_version }}
+          name: Release v${{ needs.version-and-tag.outputs.new_version }}
+          body: |
+            Auto-generated release from main branch.
+
+            ## Install via GitHub Packages
+            ```bash
+            pip install --extra-index-url https://pypi.pkg.github.com/${{ github.repository_owner }} matan-shabi-msd-pipeline-hw
+            ```
+          files: dist/*
+          draft: false
+          prerelease: false
 
   deploy-to-artifactory:
-    needs: [version-and-tag, build-and-release]
-    if: needs.version-and-tag.outputs.release_created == 'true'
+    needs: build-and-release
     runs-on: ubuntu-latest
     steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: python-package-${{ needs.version-and-tag.outputs.new_version }}
-        path: dist/
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: msd-package-${{ needs.version-and-tag.outputs.new_version }}
+          path: dist/
 
-    - name: Simulate Artifactory Upload
-      run: |
-        echo "🚀 Simulating upload to Artifactory..."
-        echo "Artifactory URL: https://artifactory.company.com/artifactory/pypi-local/"
-        echo "Package: simple-calculator-${{ needs.version-and-tag.outputs.new_version }}"
-        echo "Files to upload:"
-        ls -la dist/
-        echo "✅ Upload simulation completed"
-        
-        # In a real scenario, you would use:
-        # curl -u $ARTIFACTORY_USER:$ARTIFACTORY_PASSWORD \
-        #      -T dist/*.whl \
-        #      "https://artifactory.company.com/artifactory/pypi-local/simple-calculator/${{ needs.version-and-tag.outputs.new_version }}/"
+      - name: Simulate Artifactory upload
+        run: |
+          echo "Simulating upload to Artifactory..."
+          ls -l dist/
 
-    - name: Simulate AWS S3 Upload
-      run: |
-        echo "☁️ Simulating upload to AWS S3..."
-        echo "S3 Bucket: s3://company-python-packages/"
-        echo "Package: simple-calculator-${{ needs.version-and-tag.outputs.new_version }}"
-        echo "Files to upload:"
-        ls -la dist/
-        echo "✅ S3 upload simulation completed"
-        
-        # In a real scenario, you would use:
-        # aws s3 cp dist/ s3://company-python-packages/simple-calculator/${{ needs.version-and-tag.outputs.new_version }}/ --recursive
+      - name: Simulate AWS S3 upload
+        run: |
+          echo "Simulating upload to AWS S3..."
+          ls -l dist/
 
   notify:
-    needs: [version-and-tag, build-and-release, deploy-to-artifactory]
-    if: always() && needs.version-and-tag.outputs.release_created == 'true'
+    needs: [build-and-release, deploy-to-artifactory]
+    if: always()
     runs-on: ubuntu-latest
     steps:
-    - name: Notify Success
-      if: needs.build-and-release.result == 'success' && needs.deploy-to-artifactory.result == 'success'
-      run: |
-        echo "🎉 Release v${{ needs.version-and-tag.outputs.new_version }} completed successfully!"
-        echo "✅ Build: Success"
-        echo "✅ Artifacts: Uploaded"
-        echo "✅ Release: Created"
+      - name: Notify success
+        if: ${{ needs.build-and-release.result == 'success' && needs.deploy-to-artifactory.result == 'success' }}
+        run: echo "✅ Release successful"
 
-    - name: Notify Failure
-      if: needs.build-and-release.result == 'failure' || needs.deploy-to-artifactory.result == 'failure'
-      run: |
-        echo "❌ Release v${{ needs.version-and-tag.outputs.new_version }} failed!"
-        echo "Build status: ${{ needs.build-and-release.result }}"
-        echo "Deploy status: ${{ needs.deploy-to-artifactory.result }}"
-        exit 1
+      - name: Notify failure
+        if: ${{ needs.build-and-release.result != 'success' || needs.deploy-to-artifactory.result != 'success' }}
+        run: echo "❌ Release failed"
