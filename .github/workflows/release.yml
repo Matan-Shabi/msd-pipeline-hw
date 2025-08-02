@@ -141,7 +141,7 @@ jobs:
           index-servers = github
 
           [github]
-          repository = https://pypi.pkg.github.com/${{ github.repository_owner }}
+          repository = https://pypi.pkg.github.com/Matan-Shabi/msd-pipiline-hw
           username = __token__
           password = ${{ secrets.GITHUB_TOKEN }}
           EOF
