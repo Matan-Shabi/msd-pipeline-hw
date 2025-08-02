@@ -23,7 +23,7 @@ def get_long_description():
     return "Subnet CLI Calculator for CIDR subnetting and subnet mask calculations."
 
 setup(
-    name="subnet-cli-calculator",
+    name="matan-shabi-msd-pipeline-hw",
     version=get_version(),
     author="Matan Shabi",
     author_email="matan.shabi20@gmail.com",
