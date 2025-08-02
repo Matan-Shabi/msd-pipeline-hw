@@ -135,7 +135,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          mkdir -p ~/.pypirc
+          
           cat > ~/.pypirc <<EOF
           [distutils]
           index-servers = github
