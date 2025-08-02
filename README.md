@@ -107,11 +107,11 @@ graph TB
     L --> M[Upload Reports]
 
     M --> N{All Checks Pass?}
-    N -->|Yes| O[✅ PR Ready for Review]
-    N -->|No| P[❌ Fix Issues Required]
+    N -->|Yes| O[PR Ready for Review]
+    N -->|No| P[ Fix Issues Required]
 
-    style O fill:#90EE90
-    style P fill:#FFB6C1
+    style O fill:#098509
+    style P fill:#8f0419
 ```
 
 ## Release Workflow
@@ -139,11 +139,11 @@ graph TB
     M --> N[Simulate Deployments]
     N --> O{Deployment Success?}
 
-    O -->|Yes| P[🎉 Release Complete]
-    O -->|No| Q[❌ Notify Failure]
+    O -->|Yes| P[ Release Complete]
+    O -->|No| Q[ Notify Failure]
 
-    style P fill:#90EE90
-    style Q fill:#FFB6C1
+    style P fill:#098509
+    style Q fill:#8f0419
 ```
 
 ## How to Run It
