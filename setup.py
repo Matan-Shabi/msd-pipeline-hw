@@ -30,7 +30,7 @@ setup(
     description="A CLI tool for subnetting and subnet mask calculations",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
-    url="https://github.com/Matan-Shabi/msd-pipiline-hw",
+    url="https://github.com/Matan-Shabi/msd-pipeline-hw",
     py_modules=["main"],
     classifiers=[
         "Development Status :: 4 - Beta",
