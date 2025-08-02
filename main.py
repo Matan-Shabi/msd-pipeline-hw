@@ -3,7 +3,7 @@ Subnet Calculator (CLI version)
 Performs subnet allocation and subnet mask calculations based on user input.
 """
 
-__version__ = "1.0.6"
+__version__ = "1.0.7"
 
 import ipaddress
 from typing import List
