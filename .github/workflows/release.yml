@@ -1,0 +1,227 @@
+name: Release Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  version-and-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      release_created: ${{ steps.version.outputs.release_created }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install version bump tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bump2version
+
+    - name: Configure git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    - name: Determine version bump type
+      id: bump_type
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "bump_type=${{ github.event.inputs.version_bump }}" >> $GITHUB_OUTPUT
+        else
+          # Auto-determine bump type based on commit messages
+          if git log --format=%B -n 20 | grep -E "^(BREAKING|breaking):" > /dev/null; then
+            echo "bump_type=major" >> $GITHUB_OUTPUT
+          elif git log --format=%B -n 20 | grep -E "^(feat|feature):" > /dev/null; then
+            echo "bump_type=minor" >> $GITHUB_OUTPUT
+          else
+            echo "bump_type=patch" >> $GITHUB_OUTPUT
+          fi
+        fi
+
+    - name: Create .bumpversion.cfg
+      run: |
+        cat > .bumpversion.cfg << EOF
+        [bumpversion]
+        current_version = 1.0.0
+        commit = True
+        tag = True
+        tag_name = v{new_version}
+        message = Bump version: {current_version} → {new_version}
+
+        [bumpversion:file:main.py]
+        search = __version__ = "{current_version}"
+        replace = __version__ = "{new_version}"
+
+        [bumpversion:file:setup.py]
+        EOF
+
+    - name: Get current version
+      id: current_version
+      run: |
+        CURRENT_VERSION=$(python -c "import main; print(main.__version__)")
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        sed -i "s/current_version = 1.0.0/current_version = $CURRENT_VERSION/" .bumpversion.cfg
+
+    - name: Bump version
+      id: version
+      run: |
+        BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
+        echo "Bumping version with type: $BUMP_TYPE"
+        
+        bumpversion $BUMP_TYPE --dry-run --verbose
+        bumpversion $BUMP_TYPE
+        
+        NEW_VERSION=$(python -c "import main; print(main.__version__)")
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "release_created=true" >> $GITHUB_OUTPUT
+        
+        echo "Version bumped to: $NEW_VERSION"
+
+    - name: Push changes
+      run: |
+        git push origin main --follow-tags
+
+  build-and-release:
+    needs: version-and-tag
+    if: needs.version-and-tag.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        ref: main
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build wheel twine
+
+    - name: Install project dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install -e .
+
+    - name: Run tests before build
+      run: |
+        python -m unittest discover -s . -p "test_*.py" -v
+
+    - name: Build wheel and source distribution
+      run: |
+        python -m build
+        ls -la dist/
+
+    - name: Check build artifacts
+      run: |
+        twine check dist/*
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-package-${{ needs.version-and-tag.outputs.new_version }}
+        path: dist/
+        retention-days: 90
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ needs.version-and-tag.outputs.new_version }}
+        name: Release v${{ needs.version-and-tag.outputs.new_version }}
+        body: |
+          ## Changes in v${{ needs.version-and-tag.outputs.new_version }}
+          
+          Auto-generated release from main branch.
+          
+          ### Artifacts
+          - Python wheel: `simple_calculator-${{ needs.version-and-tag.outputs.new_version }}-py3-none-any.whl`
+          - Source distribution: `simple-calculator-${{ needs.version-and-tag.outputs.new_version }}.tar.gz`
+        files: |
+          dist/*
+        draft: false
+        prerelease: false
+
+  deploy-to-artifactory:
+    needs: [version-and-tag, build-and-release]
+    if: needs.version-and-tag.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: python-package-${{ needs.version-and-tag.outputs.new_version }}
+        path: dist/
+
+    - name: Simulate Artifactory Upload
+      run: |
+        echo "🚀 Simulating upload to Artifactory..."
+        echo "Artifactory URL: https://artifactory.company.com/artifactory/pypi-local/"
+        echo "Package: simple-calculator-${{ needs.version-and-tag.outputs.new_version }}"
+        echo "Files to upload:"
+        ls -la dist/
+        echo "✅ Upload simulation completed"
+        
+        # In a real scenario, you would use:
+        # curl -u $ARTIFACTORY_USER:$ARTIFACTORY_PASSWORD \
+        #      -T dist/*.whl \
+        #      "https://artifactory.company.com/artifactory/pypi-local/simple-calculator/${{ needs.version-and-tag.outputs.new_version }}/"
+
+    - name: Simulate AWS S3 Upload
+      run: |
+        echo "☁️ Simulating upload to AWS S3..."
+        echo "S3 Bucket: s3://company-python-packages/"
+        echo "Package: simple-calculator-${{ needs.version-and-tag.outputs.new_version }}"
+        echo "Files to upload:"
+        ls -la dist/
+        echo "✅ S3 upload simulation completed"
+        
+        # In a real scenario, you would use:
+        # aws s3 cp dist/ s3://company-python-packages/simple-calculator/${{ needs.version-and-tag.outputs.new_version }}/ --recursive
+
+  notify:
+    needs: [version-and-tag, build-and-release, deploy-to-artifactory]
+    if: always() && needs.version-and-tag.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - name: Notify Success
+      if: needs.build-and-release.result == 'success' && needs.deploy-to-artifactory.result == 'success'
+      run: |
+        echo "🎉 Release v${{ needs.version-and-tag.outputs.new_version }} completed successfully!"
+        echo "✅ Build: Success"
+        echo "✅ Artifacts: Uploaded"
+        echo "✅ Release: Created"
+
+    - name: Notify Failure
+      if: needs.build-and-release.result == 'failure' || needs.deploy-to-artifactory.result == 'failure'
+      run: |
+        echo "❌ Release v${{ needs.version-and-tag.outputs.new_version }} failed!"
+        echo "Build status: ${{ needs.build-and-release.result }}"
+        echo "Deploy status: ${{ needs.deploy-to-artifactory.result }}"
+        exit 1
