@@ -62,41 +62,39 @@ jobs:
           fi
         fi
 
-    - name: Create .bumpversion.cfg
+    - name: Get current version and bump
+      id: version
       run: |
+        CURRENT_VERSION=$(python -c "import main; print(main.__version__)")
+        BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
+        echo "Current version: $CURRENT_VERSION"
+        echo "Bumping version with type: $BUMP_TYPE"
+        
+        # Create .bumpversion.cfg with current version
         cat > .bumpversion.cfg << EOF
         [bumpversion]
-        current_version = 1.0.0
-        commit = True
-        tag = True
-        tag_name = v{new_version}
-        message = Bump version: {current_version} → {new_version}
-
+        current_version = $CURRENT_VERSION
+        commit = False
+        tag = False
+        
         [bumpversion:file:main.py]
         search = __version__ = "{current_version}"
         replace = __version__ = "{new_version}"
-
         EOF
-
-    - name: Get current version
-      id: current_version
-      run: |
-        CURRENT_VERSION=$(python -c "import main; print(main.__version__)")
-        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-        sed -i "s/current_version = 1.0.0/current_version = $CURRENT_VERSION/" .bumpversion.cfg
-
-    - name: Bump version
-      id: version
-      run: |
-        BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
-        echo "Bumping version with type: $BUMP_TYPE"
         
+        # Run bumpversion to update files
         bumpversion $BUMP_TYPE --dry-run --verbose
         bumpversion $BUMP_TYPE
         
+        # Get the new version
         NEW_VERSION=$(python -c "import main; print(main.__version__)")
         echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
         echo "release_created=true" >> $GITHUB_OUTPUT
+        
+        # Create git commit and tag manually
+        git add main.py
+        git commit -m "Bump version: $CURRENT_VERSION → $NEW_VERSION"
+        git tag -a "v$NEW_VERSION" -m "Bump version: $CURRENT_VERSION → $NEW_VERSION"
         
         echo "Version bumped to: $NEW_VERSION"
 
