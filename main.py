@@ -6,10 +6,10 @@ Performs subnet allocation and subnet mask calculations based on user input.
 __version__ = "1.0.0"
 
 import ipaddress
+from typing import List
 
-
-def calculate_subnets(network_address: str, subnet_mask: str, dept_computers: list[int]) -> str:
-    """Calculate subnets for each department based on number of computers."""
+def calculate_subnets(network_address: str, subnet_mask: str, dept_computers: List[int]) -> str:
+    """Calculate subnets for each department based on the number of computers."""
     try:
         network = ipaddress.ip_network(f"{network_address}/{subnet_mask}", strict=False)
         departments = {f"Department {i + 1}": computers for i, computers in enumerate(dept_computers)}
@@ -42,8 +42,8 @@ def calculate_subnets(network_address: str, subnet_mask: str, dept_computers: li
         return f"Error: {e}"
 
 
-def calculate_subnet_masks(host_counts: list[int]) -> str:
-    """Calculate subnet masks from list of host counts."""
+def calculate_subnet_masks(host_counts: List[int]) -> str:
+    """Calculate subnet masks from a list of host counts."""
     try:
         result = ""
         for num_hosts in host_counts:
