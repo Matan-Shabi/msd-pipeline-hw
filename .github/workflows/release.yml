@@ -1,3 +1,4 @@
+# .github/workflows/release-pipeline.yml
 name: Release Pipeline
 
 on:
@@ -13,15 +14,16 @@ on:
         required: true
         default: 'patch'
         type: choice
-        options:
-          - patch
-          - minor
-          - major
+        options: [ patch, minor, major ]
 
 permissions:
   contents: write
   packages: write
   pull-requests: write
+
+concurrency:
+  group: release-pipeline-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   version-and-tag:
@@ -38,7 +40,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install bump2version
         run: pip install bump2version
@@ -68,8 +70,7 @@ jobs:
         run: |
           CURRENT_VERSION=$(python -c "import main; print(main.__version__)")
           BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
-
-          cat > .bumpversion.cfg <<EOF
+          cat > .bumpversion.cfg <<-EOF
           [bumpversion]
           current_version = $CURRENT_VERSION
           commit = False
@@ -82,36 +83,57 @@ jobs:
 
           bumpversion $BUMP_TYPE
           NEW_VERSION=$(python -c "import main; print(main.__version__)")
-
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "release_created=true" >> $GITHUB_OUTPUT
 
+          # only commit the updated code & tag, not the config
           git add main.py
           git commit -m "Bump version: $CURRENT_VERSION → $NEW_VERSION"
           git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
 
-      - name: Push changes
+      - name: Push changes and tags
         run: git push origin main --follow-tags
 
   build-and-release:
     needs: version-and-tag
     if: needs.version-and-tag.outputs.release_created == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: [3.8, 3.9, 3.10, 3.11]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+
+      - name: Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python }}
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip
           pip install build wheel twine
           pip install -r requirements.txt || true
           pip install -e .
+
+      - name: Lint with flake8
+        run: |
+          pip install .[dev]
+          flake8 .
+
+      - name: Security scan with bandit
+        run: bandit -r .
+
+      - name: Dependency check with safety
+        run: safety check
 
       - name: Run tests
         run: python -m unittest discover -s . -p "test_*.py" -v
@@ -125,7 +147,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: msd-package-${{ needs.version-and-tag.outputs.new_version }}
+          name: msd-package-${{ needs.version-and-tag.outputs.new_version }}-${{ matrix.python }}
           path: dist/
           retention-days: 30
 
@@ -134,13 +156,7 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "[distutils]" > ~/.pypirc
-          echo "index-servers = github" >> ~/.pypirc
-          echo "[github]" >> ~/.pypirc
-          echo "repository = https://pypi.pkg.github.com/Matan-Shabi" >> ~/.pypirc
-          echo "username = __token__" >> ~/.pypirc
-          echo "password = ${{ secrets.GITHUB_TOKEN }}" >> ~/.pypirc
-
+          printf "[distutils]\nindex-servers = github\n\n[github]\nrepository = https://pypi.pkg.github.com/${{ github.repository_owner }}\nusername = __token__\npassword = ${{ secrets.GITHUB_TOKEN }}\n" > ~/.pypirc
           twine upload --repository github dist/*
 
       - name: GitHub Release
@@ -166,7 +182,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: msd-package-${{ needs.version-and-tag.outputs.new_version }}
+          name: msd-package-${{ needs.version-and-tag.outputs.new_version }}-*
           path: dist/
 
       - name: Simulate Artifactory upload
@@ -181,7 +197,6 @@ jobs:
 
   notify:
     needs: [build-and-release, deploy-to-artifactory]
-    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Notify success
