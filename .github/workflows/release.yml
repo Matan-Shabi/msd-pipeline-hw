@@ -41,8 +41,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install bump2version
-        run: |
-          pip install bump2version
+        run: pip install bump2version
 
       - name: Configure Git
         run: |
@@ -55,9 +54,9 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "bump_type=${{ github.event.inputs.version_bump }}" >> $GITHUB_OUTPUT
           else
-            if git log --format=%B -n 20 | grep -E "^(BREAKING|breaking):" > /dev/null; then
+            if git log --format=%B -n 20 | grep -Ei "^(BREAKING|breaking):"; then
               echo "bump_type=major" >> $GITHUB_OUTPUT
-            elif git log --format=%B -n 20 | grep -E "^(feat|feature):" > /dev/null; then
+            elif git log --format=%B -n 20 | grep -Ei "^(feat|feature):"; then
               echo "bump_type=minor" >> $GITHUB_OUTPUT
             else
               echo "bump_type=patch" >> $GITHUB_OUTPUT
@@ -111,7 +110,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install build wheel twine
-          pip install -r requirements.txt
+          pip install -r requirements.txt || true
           pip install -e .
 
       - name: Run tests
@@ -135,16 +134,12 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          
-          cat > ~/.pypirc <<EOF
-          [distutils]
-          index-servers = github
-
-          [github]
-          repository = https://pypi.pkg.github.com/Matan-Shabi/msd-pipiline-hw
-          username = __token__
-          password = ${{ secrets.GITHUB_TOKEN }}
-          EOF
+          echo "[distutils]" > ~/.pypirc
+          echo "index-servers = github" >> ~/.pypirc
+          echo "[github]" >> ~/.pypirc
+          echo "repository = https://pypi.pkg.github.com/Matan-Shabi" >> ~/.pypirc
+          echo "username = __token__" >> ~/.pypirc
+          echo "password = ${{ secrets.GITHUB_TOKEN }}" >> ~/.pypirc
 
           twine upload --repository github dist/*
 
