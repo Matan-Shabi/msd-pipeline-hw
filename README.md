@@ -8,9 +8,9 @@ A hands-on CI/CD pipeline built for a Python project using GitHub Actions. This 
 
 When I got the assignment, I didn’t want to just tick the boxes. I asked:
 
-* How do teams catch issues early?
-* What makes releases reliable and repeatable?
-* How can we keep security and code quality in check?
+* How do engineering teams ensure subnet logic is accurate across scenarios?
+* What makes a Python CLI tool testable and version-controlled?
+* How can we guarantee safety and traceability from dev to deploy?
 
 From there, I split the pipeline into two workflows:
 
@@ -25,7 +25,7 @@ From there, I split the pipeline into two workflows:
 
 ## Project Overview
 
-A simple calculator app with two GitHub Actions workflows:
+A subnet calculator CLI with GitHub Actions workflows:
 
 * **PR Workflow** – runs tests, linting, and security scans on pull requests
 * **Release Workflow** – bumps version, builds the package, and simulates deployment
@@ -46,12 +46,13 @@ msd-pipeline-hw/
 
 ## The App
 
-Basic calculator with:
+This CLI lets you:
 
-* Add
-* Subtract
-* Multiply
-* Divide (handles divide-by-zero)
+* Calculate subnet allocation per department
+* Determine required subnet masks for given host counts
+
+It’s useful for network planning and CIDR breakdowns.
+
 
 ## Why GitHub Actions?
 
