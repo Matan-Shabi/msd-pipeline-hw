@@ -1,7 +1,5 @@
 [![PR workflow](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/pr.yml/badge.svg)](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/pr.yml)
 [![Release workflow](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/release.yml/badge.svg)](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/release.yml)
-[![Coverage](https://img.shields.io/codecov/c/gh/Matan-Shabi/msd-pipeline-hw)](https://codecov.io/gh/Matan-Shabi/msd-pipeline-hw)
-[![PyPI version](https://img.shields.io/pypi/v/msd-pipeline-hw)](https://pypi.org/project/msd-pipeline-hw)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 # MSD Pipeline Homework - CI/CD Implementation
