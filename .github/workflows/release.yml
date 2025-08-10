@@ -89,7 +89,7 @@ jobs:
           python-version: '3.x'
 
       - name: Install bump2version
-        run: pip install bump2version
+        run: pip install bump2version==1.0.1
 
       - name: Configure git
         run: |
@@ -100,13 +100,13 @@ jobs:
         id: bump_type
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version_bump }}" ]; then
-            echo "bump_type=${{ github.event.inputs.version_bump }}" >> $GITHUB_OUTPUT
+            echo "bump_type=${{ github.event.inputs.version_bump }}" >> "$GITHUB_OUTPUT"
           elif git log --format=%B -n 10 | grep -Ei "^(BREAKING|breaking):" -m1; then
-            echo "bump_type=major" >> $GITHUB_OUTPUT
+            echo "bump_type=major" >> "$GITHUB_OUTPUT"
           elif git log --format=%B -n 10 | grep -Ei "^(feat|feature):" -m1; then
-            echo "bump_type=minor" >> $GITHUB_OUTPUT
+            echo "bump_type=minor" >> "$GITHUB_OUTPUT"
           else
-            echo "bump_type=patch" >> $GITHUB_OUTPUT
+            echo "bump_type=patch" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Bump version & tag
@@ -129,7 +129,6 @@ jobs:
           replace = __version__ = "{new_version}"
           EOF
       
-    # bump (patch/minor/major decided earlier)
          bumpversion "${{ steps.bump_type.outputs.bump_type }}"
          NEW_VERSION=$(python -c "import main; print(main.__version__)")
          echo "New: $NEW_VERSION"
