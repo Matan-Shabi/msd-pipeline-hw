@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [ main_version_2 ]
     types: [opened, synchronize, reopened]
-
+  workflow_dispatch:
 concurrency:
   group: "pr-${{ github.ref }}"
   cancel-in-progress: true
