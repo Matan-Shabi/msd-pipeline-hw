@@ -1,6 +1,13 @@
-# MSD Pipeline Homework - CI/CD Implementation
+# MSD Pipeline Homework - CI/CD Implementation (main_version_2)
 
 A hands-on CI/CD pipeline built for a Python project using GitHub Actions. This isn’t just a demo — it’s meant to mirror real-world DevOps standards like automated testing, quality checks, and structured releases.
+
+
+## What's New in `main_version_2`
+- **Quality gates in release** – Linting, testing, and security scans run before tagging a release.
+- **Optional reproducible builds** – Run manually with a pinned Python version (`build_mode=pinned`).
+- **Default artifact storage on GitHub Releases** – Optional publishing to S3 (OIDC) or Artifactory if secrets are set.
+- **Dynamic Python setup** – Uses latest `3.x` by default, verified on Python 3.9–3.12.
 
 ## My Approach
 
@@ -77,7 +84,8 @@ It’s useful for network planning and CIDR breakdowns.
 ### Versioning
 
 * `bump2version` — handles version bumps and tagging
-* Semantic commits — for patch/minor/major logic
+* Automated **semantic version bump** (`patch` / `minor` / `major`) from commit messages or manual input.
+* Git tag creation and push as part of release.
 
 ## Things I Ran Into
 
@@ -90,58 +98,28 @@ It’s useful for network planning and CIDR breakdowns.
 ```mermaid
 graph TB
     A[Developer creates PR] --> B[PR Workflow Triggers]
-    B --> C{Setup Matrix}
-    C --> D[Python 3.8]
-    C --> E[Python 3.9]
-    C --> F[Python 3.10]
-    C --> G[Python 3.11]
+    B --> C{Matrix Python Versions}
+    C --> D[Python 3.9]
+    C --> E[Python 3.10]
+    C --> F[Python 3.11]
+    C --> G[Python 3.12]
+    C --> H[Python 3.x latest]
 
-    D --> H[Install Dependencies]
-    E --> H
-    F --> H
-    G --> H
+    D --> I[Install Dependencies]
+    E --> I
+    F --> I
+    G --> I
+    H --> I
 
-    H --> I[Run Linting]
-    I --> J[Execute Tests]
-    J --> K[Generate Coverage]
-    K --> L[Security Scan]
-    L --> M[Upload Reports]
+    I --> J[Run Linting]
+    J --> K[Execute Tests]
+    K --> L[Generate Coverage]
+    L --> M[Security Scan]
+    M --> N[Upload Reports]
 
-    M --> N{All Checks Pass?}
-    N -->|Yes| O[PR Ready for Review]
-    N -->|No| P[ Fix Issues Required]
-
-    style O fill:#098509
-    style P fill:#8f0419
-```
-
-## Release Workflow
-
-```mermaid
-graph TB
-    A[Push to main / Manual trigger] --> B[Determine Version Bump]
-    B --> C[Update Version in Files]
-    C --> D[Create Git Tag]
-    D --> E[Push Changes]
-
-    E --> F[Checkout Updated Code]
-    F --> G[Run Tests]
-    G --> H[Build Package]
-    H --> I[Validate Artifacts]
-
-    I --> J[Upload to GitHub Releases]
-    I --> K[Prepare for Artifactory]
-    I --> L[Prepare for AWS S3]
-
-    J --> M[Download Artifacts]
-    K --> M
-    L --> M
-
-    M --> N[Simulate Deployments]
-    N --> O{Deployment Success?}
-
-    O -->|Yes| P[ Release Complete]
-    O -->|No| Q[ Notify Failure]
+    N --> O{All Checks Pass?}
+    O -->|Yes| P[PR Ready for Review]
+    O -->|No| Q[Fix Required]
 
     style P fill:#098509
     style Q fill:#8f0419
@@ -159,6 +137,31 @@ git push origin feature/my-feature
 ```
 
 ### Release Workflow (Auto):
+```mermaid
+flowchart TB
+    A[Trigger: push to main_version_2 or manual dispatch]
+    B[Permissions: contents, packages]
+    C[Concurrency: release-main_version_2]
+
+    D[Job verify: lint, tests, security; matrix py39 py310 py311 py312]
+E[Job bump-and-tag: resolve bump, bump version, tag, push]
+F[Job build-and-release: checkout, resolve python, build wheel, github release]
+G[Job publish-artifacts optional: upload to S3 or Artifactory]
+
+H[Inputs: build_mode latest or pinned; pinned_python_version eg 3.10.13]
+I[Python resolution: manual pinned -> that version; else .python-version; else latest 3x]
+J[S3 via OIDC: role, region, bucket]
+K[Artifactory: url, user, token]
+L[Release complete: wheels in GitHub release and optional S3 or Artifactory]
+
+A --> B --> C --> D --> E --> F --> G --> L
+F --> H --> I
+G --> J
+G --> K
+
+
+```
+
 
 ```bash
 git checkout main
