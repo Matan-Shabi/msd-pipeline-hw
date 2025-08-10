@@ -1,8 +1,8 @@
 """
-Setup script for the Simple Calculator package.
+Setup script for the Subnet CLI Calculator package.
 """
 
-from setuptools import setup, find_packages
+from setuptools import setup
 import re
 import os
 
@@ -20,17 +20,17 @@ def get_long_description():
     if os.path.exists("README.md"):
         with open("README.md", "r", encoding="utf-8") as f:
             return f.read()
-    return "Simple Calculator Application"
+    return "Subnet CLI Calculator for CIDR subnetting and subnet mask calculations."
 
 setup(
-    name="simple-calculator",
+    name="matan-shabi-msd-pipeline-hw",
     version=get_version(),
-    author="MSD Pipeline Assignment",
-    author_email="example@example.com",
-    description="A simple calculator with basic mathematical operations",
+    author="Matan Shabi",
+    author_email="matan.shabi20@gmail.com",
+    description="A CLI tool for subnetting and subnet mask calculations",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
-    url="https://github.com/example/simple-calculator",
+    url="https://github.com/Matan-Shabi/msd-pipeline-hw",
     py_modules=["main"],
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -49,6 +49,14 @@ setup(
         "dev": [
             "pytest>=6.0",
             "pytest-cov>=2.0",
+            "flake8",
+            "bandit",
+            "safety",
+        ],
+    },
+    entry_points={
+        "console_scripts": [
+            "subnet-calc=main:main",
         ],
     },
 )

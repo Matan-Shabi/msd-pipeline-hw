@@ -1,277 +1,261 @@
+[![PR workflow](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/pr.yml/badge.svg)](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/pr.yml)
+[![Release workflow](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/release.yml/badge.svg)](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 # MSD Pipeline Homework - CI/CD Implementation
 
-A complete CI/CD pipeline implementation for a Python project using GitHub Actions, demonstrating best practices for Pull Request workflows and Release automation.
+A hands-on CI/CD pipeline built for a Python project using GitHub Actions. This isn’t just a demo — it’s meant to mirror real-world DevOps standards like automated testing, quality checks, and structured releases.
+
+
+---
+
+## Table of contents
+
+- [Prerequisites](#prerequisites)  
+- [Quick start](#quick-start)  
+- [My approach](#my-approach)  
+  - [Goals](#goals)  
+  - [Design decisions](#design-decisions)  
+- [Project overview](#project-overview)  
+- [Repo structure](#repo-structure)  
+- [Workflows](#workflows)  
+  - [Pull request workflow](#pull-request-workflow)  
+  - [Release workflow](#release-workflow)  
+- [Troubleshooting](#troubleshooting)  
+
+---
+
+
+## Prerequisites
+
+- Python 3.8–3.12  
+- `pip install -r requirements.txt`  
+- (Release) AWS credentials with write access to your S3 bucket  
+
+---
+## Quick start
+
+```bash
+git clone https://github.com/Matan-Shabi/msd-pipeline-hw.git
+cd msd-pipeline-hw
+pip install -r requirements.txt
+# run tests locally
+pytest --cov=main
+# bump version, tag and build
+bump2version patch && python -m build
+```
+
+## My Approach
+
+### Why I Built It This Way
+
+## Goals
+Validate every pull request across supported Python versions
+
+Automate version bump, tagging, packaging and artifact storage
+
+Bake in linting, security scans, and coverage reporting
+
+## Design decisions
+Matrix testing on 3.8–3.12 for full compatibility
+
+flake8, bandit, safety in PR checks to catch style and vulnerabilities early
+
+bump2version for semantic versioning and automated git tags
+
+GitHub Actions for CI/CD to leverage native integration and marketplace actions
 
 ## Project Overview
 
-This project implements a simple calculator application with a comprehensive CI/CD pipeline that supports:
-- **Pull Request Workflow**: Automated testing and quality checks
-- **Release Workflow**: Version bumping, tagging, building, and artifact storage
+A subnet calculator CLI with GitHub Actions workflows:
 
-## Project Structure
+* **PR Workflow** – runs tests, linting, and security scans on pull requests
+* **Release Workflow** – bumps version, builds the package, and simulates deployment
+
+## Repo Structure
 
 ```
-msd-pipiline-hw/
-├── .github/
-│   └── workflows/
-│       ├── pr.yml          # Pull Request CI workflow
-│       └── release.yml     # Release automation workflow
-├── main.py                 # Simple calculator application
-├── test_main.py           # Unit tests for the calculator
-├── setup.py               # Package configuration
-├── requirements.txt       # Project dependencies
-└── README.md              # This file
+msd-pipeline-hw/
+├── .github/workflows/
+│   ├── pr.yml
+│   └── release.yml
+├── main.py
+├── test_main.py
+├── setup.py
+├── requirements.txt
+└── README.md
 ```
 
-## Application Description
+## The App
 
-The project contains a simple calculator application (`main.py`) with basic mathematical operations:
-- Addition
-- Subtraction
-- Multiplication  
-- Division (with zero-division protection)
+This CLI lets you:
 
-The application includes comprehensive unit tests (`test_main.py`) covering all functionality and edge cases.
+* Calculate subnet allocation per department
+* Determine required subnet masks for given host counts
 
-## CI/CD Pipeline Implementation
+It’s useful for network planning and CIDR breakdowns.
 
-### Pull Request Workflow (`.github/workflows/pr.yml`)
 
-**Trigger**: When a Pull Request is opened, updated, or reopened against the `main` branch.
+## Why GitHub Actions?
 
-**Features:**
-- **Multi-Python Version Testing**: Tests against Python 3.8, 3.9, 3.10, and 3.11
-- **Dependency Caching**: Caches pip dependencies for faster builds
-- **Code Quality Checks**: 
-  - Linting with flake8
-  - Syntax error detection
-  - Complexity analysis
-- **Testing**:
-  - Unit tests with unittest
-  - Coverage reporting with pytest-cov
-  - Coverage upload to Codecov
-- **Security Scanning**:
-  - Bandit for security vulnerability detection
-  - Safety for dependency vulnerability scanning
-  - Security reports uploaded as artifacts
+* It’s already part of GitHub — no extra tools to manage
+* Easy to learn, easy to share
+* Lots of reusable actions in the marketplace
 
-**Workflow Steps:**
-1. Checkout code
-2. Set up Python matrix (3.8-3.11)
-3. Cache dependencies
-4. Install project and dependencies
-5. Run linting checks
-6. Execute unit tests
-7. Generate coverage reports
-8. Perform security scans
-9. Upload artifacts and reports
+## Key Tools I Used
 
-### Release Workflow (`.github/workflows/release.yml`)
+### Testing
 
-**Triggers**: 
-- Push to `main` branch (automatic)
-- Manual dispatch with version bump selection
+* `unittest` — efficient and built-in
+* `pytest + coverage` — for better test reporting
+* Matrix testing — Python 3.8–3.12
 
-**Features:**
-- **Automatic Version Bumping**: Uses bump2version with semantic versioning
-- **Smart Version Detection**: Analyzes commit messages to determine bump type
-- **Git Tagging**: Creates annotated tags for releases
-- **Package Building**: Creates wheel and source distributions
-- **Multi-Stage Deployment**:
-  - GitHub Releases with artifacts
-  - Simulated Artifactory upload
-  - Simulated AWS S3 storage
-- **Comprehensive Notifications**: Success/failure reporting
+### Quality & Security
 
-**Workflow Jobs:**
+* `flake8` — code style and bugs
+* `bandit` — scans for security issues
+* `safety` — checks for vulnerable dependencies
 
-1. **version-and-tag**:
-   - Determines version bump type (patch/minor/major)
-   - Updates version in source files
-   - Creates git tag
-   - Pushes changes to repository
+### Versioning
 
-2. **build-and-release**:
-   - Runs tests before building
-   - Creates wheel and source distributions
-   - Validates build artifacts
-   - Creates GitHub release with artifacts
+* `bump2version` — handles version bumps and tagging
+* Semantic commits — for patch/minor/major logic
 
-3. **deploy-to-artifactory**:
-   - Simulates upload to Artifactory
-   - Simulates upload to AWS S3
-   - In production, would use actual credentials and endpoints
+## Things I Ran Into
 
-4. **notify**:
-   - Reports pipeline success/failure
-   - Provides deployment status
+* **bump2version** failed on untracked files — solved it by handling version updates separately from git push
+* **GITHUB\_TOKEN** didn’t allow pushing — fixed by explicitly setting permissions in the workflow
+* **Publishing** — GitHub Package registry has strict naming rules, so I set it up but left it commented for now
 
-## Tool Selection and Rationale
+## Workflows
 
-### GitHub Actions
-**Why chosen**: 
-- Native integration with GitHub repositories
-- Rich ecosystem of pre-built actions
-- Matrix builds for multi-version testing
-- Built-in artifact storage
-- Comprehensive workflow orchestration
+## Pull Request Workflow
 
-**Alternatives considered**: Azure DevOps (mentioned in requirements but GitHub Actions chosen for better integration)
+```mermaid
+graph TB
+    A[Developer creates PR] --> B[PR Workflow Triggers]
+    B --> C{Setup Matrix}
+    C --> D[Python 3.8]
+    C --> E[Python 3.9]
+    C --> F[Python 3.10]
+    C --> G[Python 3.11]
 
-### Testing Tools
-- **unittest**: Python's built-in testing framework for reliability
-- **pytest**: Advanced testing features and coverage reporting
-- **flake8**: Comprehensive linting and style checking
-- **bandit**: Security-focused static analysis
-- **safety**: Dependency vulnerability scanning
+    D --> H[Install Dependencies]
+    E --> H
+    F --> H
+    G --> H
 
-### Version Management
-- **bump2version**: Reliable semantic versioning with git integration
-- **setuptools**: Standard Python packaging
-- **wheel**: Modern Python distribution format
+    H --> I[Run Linting]
+    I --> J[Execute Tests]
+    J --> K[Generate Coverage]
+    K --> L[Security Scan]
+    L --> M[Upload Reports]
 
-### Deployment Simulation
-- **Artifactory**: Enterprise artifact repository (simulated)
-- **AWS S3**: Cloud storage for packages (simulated)
-- **GitHub Releases**: Built-in release management
+    M --> N{All Checks Pass?}
+    N -->|Yes| O[PR Ready for Review]
+    N -->|No| P[ Fix Issues Required]
 
-## Manual Pipeline Execution
+    style O fill:#098509
+    style P fill:#8f0419
+```
 
-### Running the PR Workflow
-1. Create a feature branch: `git checkout -b feature/my-feature`
-2. Make your changes and commit
-3. Push branch: `git push origin feature/my-feature`
-4. Open a Pull Request against `main`
-5. The PR workflow will automatically trigger
+## Release Workflow
 
-### Running the Release Workflow
+```mermaid
+graph TB
+    A[Push to main / Manual trigger] --> B[Determine Version Bump]
+    B --> C[Update Version in Files]
+    C --> D[Create Git Tag]
+    D --> E[Push Changes]
 
-**Automatic (on push to main):**
+    E --> F[Checkout Updated Code]
+    F --> G[Run Tests]
+    G --> H[Build Package]
+    H --> I[Validate Artifacts]
+
+    I --> J[Upload to GitHub Releases]
+    I --> K[Prepare for Artifactory]
+    I --> L[Prepare for AWS S3]
+
+    J --> M[Download Artifacts]
+    K --> M
+    L --> M
+
+    M --> N[Simulate Deployments]
+    N --> O{Deployment Success?}
+
+    O -->|Yes| P[ Release Complete]
+    O -->|No| Q[ Notify Failure]
+
+    style P fill:#098509
+    style Q fill:#8f0419
+```
+
+## How to Run It
+
+### PR Workflow:
+
+```bash
+git checkout -b feature/my-feature
+git commit -m "feat: new stuff"
+git push origin feature/my-feature
+# Open PR to main
+```
+
+### Release Workflow (Auto):
+
 ```bash
 git checkout main
-git pull origin main
-# Make changes and commit
-git push origin main
-# Release workflow triggers automatically
+git pull
+# Push your changes
+# Workflow triggers automatically
 ```
 
-**Manual (with version control):**
-1. Go to Actions tab in GitHub
-2. Select "Release Pipeline" workflow
-3. Click "Run workflow"
-4. Choose version bump type (patch/minor/major)
-5. Click "Run workflow"
+### Release Workflow (Manual):
 
-### Local Development and Testing
+* Go to GitHub → Actions → Release → Run Workflow
+* Choose patch/minor/major
 
-**Setup:**
+## Local Dev
+
 ```bash
-# Clone repository
-git clone <repository-url>
-cd msd-pipiline-hw
-
-# Install dependencies
+git clone <repo>
+cd msd-pipeline-hw
 pip install -r requirements.txt
 pip install -e .
 ```
 
-**Run tests locally:**
+### Run tests:
+
 ```bash
-# Unit tests
-python -m unittest discover -s . -p "test_*.py" -v
-
-# With coverage
-pip install pytest-cov
+python -m unittest
 pytest --cov=main --cov-report=term-missing
+```
 
-# Linting
-pip install flake8
-flake8 . --max-line-length=127
+### Lint & Scan:
 
-# Security scan
-pip install bandit safety
+```bash
+flake8 .
 bandit -r .
 safety check
 ```
 
-**Build package locally:**
+### Build package:
+
 ```bash
-pip install build
 python -m build
-# Artifacts created in dist/ directory
 ```
 
-## Workflow Scenarios Explained
+## Troubleshooting
+Q: bump2version fails on untracked files?
+A: Commit your version file before running the bump.
 
-### Pull Request Scenario
-**Purpose**: Ensure code quality and functionality before merging
+Q: GITHUB_TOKEN can’t push tags?
+A: Explicitly grant contents: write permissions in the workflow.
 
-**Process**:
-1. Developer creates PR → Workflow triggers
-2. Code is tested across multiple Python versions
-3. Quality checks (linting, security) are performed
-4. Coverage reports are generated
-5. Reviewers can see test results before approving
-6. Only passing PRs should be merged
+Q: GitHub Packages naming errors?
+A: Follow <owner>/<repo> naming convention or comment out until you register the package name.
 
-**Key Benefits**:
-- Prevents broken code from reaching main branch
-- Ensures compatibility across Python versions
-- Maintains code quality standards
-- Provides security vulnerability detection
+## Wrap-Up
 
-### Release Scenario
-**Purpose**: Automate the entire release process from version bumping to deployment
-
-**Process**:
-1. Code is merged to main → Release workflow triggers
-2. Version is automatically bumped based on commit messages
-3. Git tag is created for the new version
-4. Package is built and tested
-5. Artifacts are uploaded to multiple storage locations
-6. GitHub release is created with release notes
-7. Notifications confirm successful deployment
-
-**Key Benefits**:
-- Eliminates manual release steps
-- Ensures consistent versioning
-- Provides automated testing before release
-- Creates reliable artifact storage
-- Maintains release history and traceability
-
-## Production Considerations
-
-For production use, consider these enhancements:
-
-1. **Security**:
-   - Store sensitive credentials in GitHub Secrets
-   - Use OIDC for cloud provider authentication
-   - Implement signed commits and releases
-
-2. **Monitoring**:
-   - Add Slack/Teams notifications
-   - Implement deployment monitoring
-   - Set up alerting for failed workflows
-
-3. **Advanced Features**:
-   - Blue-green deployments
-   - Rollback mechanisms
-   - Integration testing environments
-   - Performance testing stages
-
-4. **Compliance**:
-   - Add audit logging
-   - Implement approval gates
-   - Security scanning integration
-   - License compliance checking
-
-## Conclusion
-
-This implementation demonstrates a complete CI/CD pipeline that:
-- Maintains code quality through automated testing
-- Ensures security through vulnerability scanning
-- Automates the entire release process
-- Provides reliable artifact storage and deployment
-- Follows industry best practices for Python projects
-
-The pipeline is designed to be both educational and production-ready, with clear separation between PR validation and release automation workflows.
+This project shows how CI/CD can be clean, reliable, and team-friendly — even for small apps. It’s designed to scale and adapt to real team needs without the fluff.
