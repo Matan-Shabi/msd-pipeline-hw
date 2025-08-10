@@ -214,21 +214,21 @@ jobs:
 
       # --- Option A: AWS S3 via OIDC (no static keys) ---
       - name: Configure AWS credentials (OIDC)
-        if: ${{ secrets.AWS_ROLE_TO_ASSUME && secrets.AWS_REGION && secrets.S3_BUCKET }}
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' && secrets.AWS_REGION != '' && secrets.S3_BUCKET != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Upload to S3
-        if: ${{ secrets.AWS_ROLE_TO_ASSUME && secrets.S3_BUCKET }}
+        if: ${{ secrets.AWS_ROLE_TO_ASSUME != '' && secrets.S3_BUCKET != '' }}
         run: |
           aws s3 cp dist/ s3://${{ secrets.S3_BUCKET }}/msd-pipeline-hw/v${{ needs.bump-and-tag.outputs.new_version }}/ --recursive
           echo "✅ Uploaded wheels to s3://${{ secrets.S3_BUCKET }}/msd-pipeline-hw/v${{ needs.bump-and-tag.outputs.new_version }}/"
 
       # --- Option B: Artifactory ---
       - name: Upload to Artifactory
-        if: ${{ secrets.ARTIFACTORY_URL && secrets.ARTIFACTORY_USER && secrets.ARTIFACTORY_TOKEN }}
+        if: ${{ secrets.ARTIFACTORY_URL != '' && secrets.ARTIFACTORY_USER != '' && secrets.ARTIFACTORY_TOKEN != '' }}
         env:
           URL: ${{ secrets.ARTIFACTORY_URL }}
           USER: ${{ secrets.ARTIFACTORY_USER }}
