@@ -112,15 +112,18 @@ jobs:
           set -euo pipefail
           CURRENT_VERSION=$(python -c "import sys; sys.path.insert(0, '.'); import main; print(main.__version__)")
           echo "Current: $CURRENT_VERSION"
-          cat > .bumpversion.cfg <<EOF
-          [bumpversion]
-          current_version = ${CURRENT_VERSION}
-          commit = False
-          tag = False
-          [bumpversion:file:main.py]
-          search = __version__ = "{current_version}"
-          replace = __version__ = "{new_version}"
-          EOF
+
+          # Write .bumpversion.cfg safely (no heredoc indentation issues)
+          printf "%s\n" \
+            "[bumpversion]" \
+            "current_version = ${CURRENT_VERSION}" \
+            "commit = False" \
+            "tag = False" \
+            "" \
+            "[bumpversion:file:main.py]" \
+            'search = __version__ = "{current_version}"' \
+            'replace = __version__ = "{new_version}"' \
+            > .bumpversion.cfg
           
           bumpversion "${{ steps.bump_type.outputs.bump_type }}"
           NEW_VERSION=$(python -c "import sys; sys.path.insert(0, '.'); import main; print(main.__version__)")
@@ -185,7 +188,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: python-package-${{ needs.bump-and-tag.outputs.new_version }}
+          name: python-package-${{ needs.bump-and-tag.outputs.new_version }}-main_v2
           path: dist/
           retention-days: 90
 
@@ -204,10 +207,25 @@ jobs:
     needs: build-and-release
     runs-on: ubuntu-latest
     steps:
-      - name: Download artifact
+      - name: Compute artifact name
+        id: art
+        run: echo "name=python-package-${{ needs.bump-and-tag.outputs.new_version }}-main_v2" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact artifact
+        id: dl_exact
         uses: actions/download-artifact@v4
         with:
-          name: python-package-${{ needs.bump-and-tag.outputs.new_version }}
+          name: ${{ steps.art.outputs.name }}
+          path: dist/
+          merge-multiple: false
+
+      - name: "Fallback: download by pattern (main_v2 only)"
+        if: ${{ steps.dl_exact.outcome != 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: python-package-*-main_v2
+          path: dist/
+          merge-multiple: true
 
       - name: Ensure dist path
         run: |
