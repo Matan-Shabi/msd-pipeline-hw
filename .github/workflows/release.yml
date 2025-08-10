@@ -41,10 +41,16 @@ jobs:
       matrix:
         python-version: ["3.9", "3.10", "3.11","3.12"]
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: actions/setup-python@v5
-        with: { python-version: ${{ matrix.python-version }} }
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
@@ -68,13 +74,20 @@ jobs:
     outputs:
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-python@v5
-        with: { python-version: '3.x' }
-      - run: pip install bump2version
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install bump2version
+        run: pip install bump2version
+
       - name: Configure git
         run: |
           git config --local user.name "github-actions[bot]"
@@ -120,8 +133,10 @@ jobs:
       contents: write
       packages: write
     steps:
-      - uses: actions/checkout@v4
-        with: { ref: main_version_2 }
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main_version_2
 
       - name: Resolve Python version
         id: pyver
@@ -138,7 +153,8 @@ jobs:
             echo "mode=latest" >> $GITHUB_OUTPUT
           fi
 
-      - uses: actions/setup-python@v5
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ steps.pyver.outputs.version }}
 
@@ -162,7 +178,8 @@ jobs:
           twine check dist/*
           ls -la dist/
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
           name: python-package-${{ needs.bump-and-tag.outputs.new_version }}
           path: dist/
@@ -183,14 +200,15 @@ jobs:
     needs: build-and-release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v4
         with:
           name: python-package-${{ needs.bump-and-tag.outputs.new_version }}
-        # path defaults to ./; we’ll upload from ./dist below
+
       - name: Ensure dist path
         run: |
           mkdir -p dist
-          # Some runners place artifacts in the working dir; normalize:
+          
           shopt -s nullglob
           for f in *.whl *.tar.gz; do mv "$f" dist/; done
 
