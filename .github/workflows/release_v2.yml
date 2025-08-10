@@ -129,7 +129,7 @@ jobs:
 
           git add main.py
           git commit -m "chore: bump version $CURRENT_VERSION -> $NEW_VERSION" || echo "No changes to commit"
-          git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+          git tag -a "v$NEW_VERSION-v2" -m "Release v$NEW_VERSION (v2 branch)"
           git push origin main_v2
           git push origin --tags
 
@@ -192,8 +192,8 @@ jobs:
       - name: Create GitHub Release (attach wheels)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.bump-and-tag.outputs.new_version }}
-          name: "Release v${{ needs.bump-and-tag.outputs.new_version }}"
+          tag_name: v${{ needs.bump-and-tag.outputs.new_version }}-v2
+          name: "Release v${{ needs.bump-and-tag.outputs.new_version }}-v2"
           body: |
             Verified on Python 3.9–3.12; built on ${{ steps.pyver.outputs.version }} (mode=${{ steps.pyver.outputs.mode }}).
             Artifacts are attached below and serve as the designated storage for this release.
