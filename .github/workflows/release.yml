@@ -115,13 +115,14 @@ jobs:
           CURRENT_VERSION=$(python -c "import main; print(main.__version__)")
           cat > .bumpversion.cfg << 'EOF'
           [bumpversion]
+          current_version = ${CURRENT_VERSION}
           commit = False
           tag = False
           [bumpversion:file:main.py]
           search = __version__ = "{current_version}"
           replace = __version__ = "{new_version}"
           EOF
-          # Write current version into config (avoids YAML quoting issues)
+      
           sed -i "1i current_version = ${CURRENT_VERSION}" .bumpversion.cfg
           bumpversion "${{ steps.bump_type.outputs.bump_type }}"
           NEW_VERSION=$(python -c "import main; print(main.__version__)")
