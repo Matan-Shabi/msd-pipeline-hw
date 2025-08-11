@@ -1,27 +1,69 @@
+[![PR workflow](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/pr.yml/badge.svg)](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/pr.yml)
+[![Release workflow](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/release.yml/badge.svg)](https://github.com/Matan-Shabi/msd-pipeline-hw/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 # MSD Pipeline Homework - CI/CD Implementation
 
 A hands-on CI/CD pipeline built for a Python project using GitHub Actions. This isn’t just a demo — it’s meant to mirror real-world DevOps standards like automated testing, quality checks, and structured releases.
+
+
+---
+
+## Table of contents
+
+- [Prerequisites](#prerequisites)  
+- [Quick start](#quick-start)  
+- [My approach](#my-approach)  
+  - [Goals](#goals)  
+  - [Design decisions](#design-decisions)  
+- [Project overview](#project-overview)  
+- [Repo structure](#repo-structure)  
+- [Workflows](#workflows)  
+  - [Pull request workflow](#pull-request-workflow)  
+  - [Release workflow](#release-workflow)  
+- [Troubleshooting](#troubleshooting)  
+
+---
+
+
+## Prerequisites
+
+- Python 3.8–3.12  
+- `pip install -r requirements.txt`  
+- (Release) AWS credentials with write access to your S3 bucket  
+
+---
+## Quick start
+
+```bash
+git clone https://github.com/Matan-Shabi/msd-pipeline-hw.git
+cd msd-pipeline-hw
+pip install -r requirements.txt
+# run tests locally
+pytest --cov=main
+# bump version, tag and build
+bump2version patch && python -m build
+```
 
 ## My Approach
 
 ### Why I Built It This Way
 
-When I got the assignment, I didn’t want to just tick the boxes. I asked:
+## Goals
+Validate every pull request across supported Python versions
 
-* How do engineering teams ensure subnet logic is accurate across scenarios?
-* What makes a Python CLI tool testable and version-controlled?
-* How can we guarantee safety and traceability from dev to deploy?
+Automate version bump, tagging, packaging and artifact storage
 
-From there, I split the pipeline into two workflows:
+Bake in linting, security scans, and coverage reporting
 
-* One for PRs: to test and validate changes before merging
-* One for releases: to bump versions, tag, and package
+## Design decisions
+Matrix testing on 3.8–3.12 for full compatibility
 
-### What I’d Want as a Team Lead
+flake8, bandit, safety in PR checks to catch style and vulnerabilities early
 
-* Tests that run on all major Python versions
-* Lint and security checks baked into every PR
-* Clean, tagged releases with artifacts and traceable changes
+bump2version for semantic versioning and automated git tags
+
+GitHub Actions for CI/CD to leverage native integration and marketplace actions
 
 ## Project Overview
 
@@ -84,6 +126,8 @@ It’s useful for network planning and CIDR breakdowns.
 * **bump2version** failed on untracked files — solved it by handling version updates separately from git push
 * **GITHUB\_TOKEN** didn’t allow pushing — fixed by explicitly setting permissions in the workflow
 * **Publishing** — GitHub Package registry has strict naming rules, so I set it up but left it commented for now
+
+## Workflows
 
 ## Pull Request Workflow
 
@@ -201,6 +245,16 @@ safety check
 ```bash
 python -m build
 ```
+
+## Troubleshooting
+Q: bump2version fails on untracked files?
+A: Commit your version file before running the bump.
+
+Q: GITHUB_TOKEN can’t push tags?
+A: Explicitly grant contents: write permissions in the workflow.
+
+Q: GitHub Packages naming errors?
+A: Follow <owner>/<repo> naming convention or comment out until you register the package name.
 
 ## Wrap-Up
 

@@ -4,7 +4,10 @@ Performs subnet allocation and subnet mask calculations based on user input.
 """
 
 
-__version__ = "1.0.0"
+
+__version__ = "8.0.0"
+
+
 
 import ipaddress
 from typing import List
